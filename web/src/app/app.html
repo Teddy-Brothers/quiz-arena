@@ -1,0 +1,237 @@
+<app-nav current="quiz" />
+
+<main class="wrap">
+  @if (view() === 'home') {
+    <section class="hero">
+      <div class="eyebrow">Creative Consultancy · Interactive portfolio</div>
+      <h1>Quiz Arena</h1>
+      <p class="lede">A live quiz for classrooms and events. A host shows the questions, players answer on their own screens, faster correct answers score more, and a 3D podium crowns the winners.</p>
+    </section>
+
+    <section class="grid three-up" id="demo">
+      <div class="card">
+        <h3>Try a solo demo</h3>
+        <p class="muted">Play a round yourself against three bots. Works instantly with no setup.</p>
+        <button class="btn primary" (click)="mode.set('local'); createRoom(true)" [disabled]="busy()">Start Solo Demo</button>
+      </div>
+      <div class="card">
+        <h3>Host a game</h3>
+        <p class="muted">Pick the questions and open a room. Players join with a short code.</p>
+        <button class="btn" (click)="go('setup')">Host a Game</button>
+      </div>
+      <div class="card">
+        <h3>Join a game</h3>
+        <p class="muted">Have a room code? Enter it with a nickname.</p>
+        <button class="btn" (click)="go('join')">Join a Game</button>
+      </div>
+    </section>
+    @if (error()) { <div class="callout warn">{{ error() }}</div> }
+
+    <section class="block">
+      <div class="grid two">
+        <div>
+          <h2>How it works</h2>
+          <ol>
+            <li>The host opens a room and shares the code.</li>
+            <li>Players join from their own tab or device and pick a nickname.</li>
+            <li>Each question has a timer. A correct answer scores 500 to 1000 points, more for speed, plus a small streak bonus.</li>
+            <li>After every question the host sees how the room answered and who is ahead.</li>
+            <li>The top three stand on a 3D podium at the end.</li>
+          </ol>
+          <h3>Two ways to connect</h3>
+          <p><strong>This browser:</strong> players join from other tabs or windows of the same browser. No server needed, ideal for a quick demo.</p>
+          <p><strong>Network:</strong> a small Node relay carries messages between devices. Players on other devices must be able to reach the API's address.</p>
+        </div>
+        <div>
+          <h2>Technical approach</h2>
+          <ul>
+            <li>Angular with signals. The host's browser is authoritative: it holds the answers, the timer and the scores.</li>
+            <li>Correct answers are only sent to players after the question closes.</li>
+            <li>Three.js builds the podium from basic shapes. Confetti respects reduced motion.</li>
+            <li>The optional Node API relays rooms over Server-Sent Events and can generate questions through a provider adapter: <code>mock</code> by default, <code>anthropic</code> with a key.</li>
+          </ul>
+          <h3>Limitations</h3>
+          <p class="small muted">Rooms live in memory and vanish on refresh. A host who closes the tab ends the game. There is no cheating protection beyond hiding answers until reveal. Generated questions must be checked by a person before use. Sample questions are original and written for this demo.</p>
+        </div>
+      </div>
+    </section>
+  }
+
+  @if (view() === 'setup') {
+    <section class="hero small-hero">
+      <h1>Host a game</h1>
+    </section>
+    <div class="grid two">
+      <div class="card">
+        <h3>Questions</h3>
+        <p><strong>{{ pack().title }}</strong> · {{ pack().questions.length }} questions</p>
+        <p class="small muted">{{ packLabel() }}</p>
+        <label class="field" for="topic">Generate a new set with AI <span class="chip warn">optional</span></label>
+        <div class="ask">
+          <input id="topic" type="text" [value]="topic()" (input)="setTopic($event)" (keydown.enter)="generate()" placeholder="For example: the solar system" />
+          <button class="btn" (click)="generate()" [disabled]="genBusy() || !topic().trim()">{{ genBusy() ? 'Generating…' : 'Generate' }}</button>
+        </div>
+        @if (genError()) { <div class="callout warn" style="margin-top:12px">{{ genError() }}</div> }
+        <div class="toolbar" style="margin-top:12px"><button class="btn small" (click)="useSample()">Use Sample Pack</button></div>
+      </div>
+      <div class="card">
+        <h3>Connection</h3>
+        <div class="seg" role="group" aria-label="Connection mode">
+          <button [class.on]="mode() === 'local'" (click)="setMode('local')" [attr.aria-pressed]="mode() === 'local'">This browser</button>
+          <button [class.on]="mode() === 'network'" (click)="setMode('network')" [attr.aria-pressed]="mode() === 'network'">Network (API)</button>
+        </div>
+        <p class="small muted" style="margin-top:8px">{{ mode() === 'local' ? 'Players join from other tabs or windows of this browser.' : 'Players connect through the Node relay. Start the API first.' }}</p>
+        @if (error()) { <div class="callout warn">{{ error() }}</div> }
+        <div class="toolbar">
+          <button class="btn primary" (click)="createRoom()" [disabled]="busy()">Create Room</button>
+          <button class="btn" (click)="go('home')">Back</button>
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (view() === 'join') {
+    <section class="hero small-hero"><h1>Join a game</h1></section>
+    <div class="card narrow">
+      <label class="field" for="code">Room code</label>
+      <input id="code" type="text" [value]="joinCode()" (input)="setJoin($event)" maxlength="8" autocomplete="off" class="big-input" />
+      <label class="field" for="nick" style="margin-top:12px">Nickname</label>
+      <input id="nick" type="text" [value]="playerName()" (input)="setName($event)" maxlength="16" autocomplete="off" (keydown.enter)="join()" />
+      <div class="seg" role="group" aria-label="Connection mode" style="margin-top:12px">
+        <button [class.on]="mode() === 'local'" (click)="setMode('local')" [attr.aria-pressed]="mode() === 'local'">This browser</button>
+        <button [class.on]="mode() === 'network'" (click)="setMode('network')" [attr.aria-pressed]="mode() === 'network'">Network (API)</button>
+      </div>
+      @if (error()) { <div class="callout warn" style="margin-top:12px">{{ error() }}</div> }
+      <div class="toolbar" style="margin-top:16px">
+        <button class="btn primary" (click)="join()">Join</button>
+        <button class="btn" (click)="go('home')">Back</button>
+      </div>
+    </div>
+  }
+
+  @if (view() === 'host') { <ng-container [ngTemplateOutlet]="hostTpl" /> }
+  @if (view() === 'player') { <ng-container [ngTemplateOutlet]="playerTpl" /> }
+  @if (view() === 'solo') {
+    <div class="solo-grid">
+      <div><div class="small muted tag">Host screen</div><ng-container [ngTemplateOutlet]="hostTpl" /></div>
+      <div><div class="small muted tag">Your screen</div><ng-container [ngTemplateOutlet]="playerTpl" /></div>
+    </div>
+  }
+</main>
+<footer class="wrap small muted" style="padding-bottom:32px">Teddy Brother Studio · creative consultancy portfolio</footer>
+
+<!-- HOST SCREEN -->
+<ng-template #hostTpl>
+  @if (hostState(); as s) {
+    <div class="card host" aria-live="polite">
+      <div class="toolbar between">
+        <span class="chip">Room {{ hostCode() }}</span>
+        <span class="small muted">{{ s.packTitle }}</span>
+        <button class="btn small danger" (click)="leave()">End Game</button>
+      </div>
+
+      @if (s.phase === 'lobby') {
+        <h2>Waiting for players</h2>
+        <p class="room-code">{{ hostCode() }}</p>
+        <p class="muted">Open this page in another tab, choose <strong>Join a Game</strong> and enter the code{{ mode() === 'network' ? ' (Network mode)' : '' }}.</p>
+        <div class="players">
+          @for (p of s.players; track p.id) { <span class="chip" [class.info]="p.bot">{{ p.name }}{{ p.bot ? ' (bot)' : '' }}</span> }
+          @empty { <span class="muted small">No players yet</span> }
+        </div>
+        <div class="toolbar" style="margin-top:16px">
+          <button class="btn primary" (click)="start()" [disabled]="!s.players.length">Start Game</button>
+          <button class="btn" (click)="addBots()">Add 3 Bots</button>
+        </div>
+      }
+
+      @if (s.phase === 'question' && s.question; as q) {
+        <div class="small muted">Question {{ s.qIndex + 1 }} of {{ s.total }} · {{ hostAnswered() }} of {{ s.players.length }} answered</div>
+        <div class="timer" role="progressbar" [attr.aria-valuenow]="secs(hostRemaining())" aria-valuemin="0" [attr.aria-valuemax]="secs(s.limitMs)" aria-label="Time left"><div [style.width.%]="pct(hostRemaining(), s.limitMs)"></div></div>
+        <h2 class="qtext">{{ q.text }}</h2>
+        <div class="choices">
+          @for (c of q.choices; track $index) { <div class="tile" [class]="'tile c' + $index"><span class="shape" aria-hidden="true">{{ shapes[$index] }}</span><span class="sr">{{ letters[$index] }}.</span> {{ c }}</div> }
+        </div>
+        <div class="toolbar" style="margin-top:12px"><button class="btn small" (click)="skip()">Close Question Now</button><span class="small muted">{{ secs(hostRemaining()) }}s left</span></div>
+      }
+
+      @if (s.phase === 'reveal' && s.question && s.reveal; as r) {
+        <div class="small muted">Question {{ s.qIndex + 1 }} of {{ s.total }}</div>
+        <h2 class="qtext">{{ s.question.text }}</h2>
+        <div class="choices">
+          @for (c of s.question.choices; track $index) {
+            <div class="tile" [class]="'tile c' + $index" [class.dim]="$index !== r.correct">
+              <span class="shape" aria-hidden="true">{{ shapes[$index] }}</span> {{ c }}
+              @if ($index === r.correct) { <strong class="ok-mark">Correct</strong> }
+              <span class="count">{{ r.counts[$index] }} answered</span>
+              <span class="countbar"><span [style.width.%]="barPct(r.counts[$index], r.counts)"></span></span>
+            </div>
+          }
+        </div>
+        <p class="callout">{{ r.explanation }}</p>
+        <h3>Leaderboard</h3>
+        <ol class="board">
+          @for (p of s.players.slice(0, 5); track p.id) { <li><span>{{ p.name }}</span><span>{{ p.score }} <span class="small muted">{{ p.delta ? '+' + p.delta : '' }}</span></span></li> }
+        </ol>
+        <button class="btn primary" (click)="next()">{{ s.qIndex + 1 < s.total ? 'Next Question' : 'Show Podium' }}</button>
+      }
+
+      @if (s.phase === 'podium') {
+        <h2>Final results</h2>
+        <div class="podium-stage">
+          <canvas #podiumCanvas role="img" aria-label="3D podium with the top three players"></canvas>
+          @if (!webglOk()) { <div class="muted">3D is not available. See the ranking below.</div> }
+        </div>
+        <ol class="board">
+          @for (p of s.players; track p.id) { <li><span>{{ $index + 1 }}. {{ p.name }}</span><span>{{ p.score }}</span></li> }
+        </ol>
+      }
+    </div>
+  }
+</ng-template>
+
+<!-- PLAYER SCREEN -->
+<ng-template #playerTpl>
+  <div class="card player" aria-live="polite">
+    @if (!playerState()) {
+      <h2>Connecting…</h2>
+      <p class="muted">Waiting for the host. Check the room code if this takes long.</p>
+      <button class="btn" (click)="leave()">Cancel</button>
+    }
+    @if (playerState(); as s) {
+      @if (s.phase === 'lobby') {
+        <h2>You are in</h2>
+        <p class="muted">Waiting for the host to start. {{ s.players.length }} player{{ s.players.length === 1 ? '' : 's' }} in the room.</p>
+      }
+      @if (s.phase === 'question' && s.question; as q) {
+        <div class="small muted">Question {{ s.qIndex + 1 }} of {{ s.total }}</div>
+        <div class="timer" role="progressbar" [attr.aria-valuenow]="secs(playerRemaining())" aria-valuemin="0" [attr.aria-valuemax]="secs(s.limitMs)" aria-label="Time left"><div [style.width.%]="pct(playerRemaining(), s.limitMs)"></div></div>
+        <h3>{{ q.text }}</h3>
+        @if (myChoice() === null) {
+          <div class="choices small-tiles">
+            @for (c of q.choices; track $index) {
+              <button class="tile" [class]="'tile c' + $index" (click)="choose($index)"><span class="shape" aria-hidden="true">{{ shapes[$index] }}</span> {{ c }}</button>
+            }
+          </div>
+        } @else {
+          <div class="callout">Answer locked in: <strong>{{ shapes[myChoice()!] }} {{ q.choices[myChoice()!] }}</strong>. Waiting for the others.</div>
+        }
+      }
+      @if (s.phase === 'reveal' && s.reveal; as r) {
+        @if (myInfo(); as me) {
+          @if (me.correct === true) { <h2 class="good">Correct, +{{ me.delta }}</h2> }
+          @else if (me.correct === false) { <h2 class="bad">Not quite</h2> }
+          @else { <h2 class="bad">Time ran out</h2> }
+          <p>You are #{{ myRank() }} with {{ me.score }} points.</p>
+        }
+        <p class="callout">{{ r.explanation }}</p>
+        <p class="small muted">Waiting for the host to continue.</p>
+      }
+      @if (s.phase === 'podium') {
+        <h2>Game over</h2>
+        @if (myInfo(); as me) { <p class="lede-small">You finished <strong>#{{ myRank() }}</strong> with {{ me.score }} points.</p> }
+        <p class="muted small">The podium is on the host screen.</p>
+        <button class="btn" (click)="leave()">Leave</button>
+      }
+    }
+  </div>
+</ng-template>
