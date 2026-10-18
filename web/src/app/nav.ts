@@ -37,7 +37,7 @@ const SITES: Site[] = [
     .seg a { text-decoration: none; color: var(--ink); font-size: 0.8125rem; font-weight: 500; padding: 6px 14px; min-height: 32px; display: flex; align-items: center; border-radius: 8px; }
     @media (pointer: coarse) { .seg a { min-height: 44px; } }
     .seg a.active { background: var(--surface); font-weight: 600; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2); }
-    @media (max-width: 520px) { .brand { display: none; } .seg { width: 100%; } .seg a { flex: 1; justify-content: center; padding: 6px 4px; } }
+    @media (max-width: 520px) { .brand { display: none; } .seg { width: 100%; } .seg a { flex: 1; justify-content: center; padding: 6px 2px; font-size: 0.72rem; white-space: nowrap; } }
   `,
 })
 export class Nav {
